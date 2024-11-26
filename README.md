@@ -1,10 +1,14 @@
 # DM-2024 Lab2 HW
 code by 111060026 daisyliu0225
+name: 劉孟瑋
+Student ID: 111060026
+github ID: daisyliu0225
+Kaggle name: daisyliu0225
 
 ---
 # Adapted Versions
-## Code 1: BOW+Deep learning
-The code in the repo is: 
+## Code 1: BOW + Deep learning
+The code in the repo is: version2_BOW
 ### Versions
 |Version|Max Features|Train Data Sample|epoch|batch size|    Result    |
 |-------|------------|-----------------|-----|----------|--------------|
@@ -25,5 +29,13 @@ A few conclusions:
 
 ---
 # Discarded Versions
-## Code 1: 
+## Code 1: Decision Tree
+The code in the repo is: version1_decision_tree<br>
+Discarded reason: Training the decision tree is too long and the accuracy is too low. Only around 0.3.<br>
+## Code 2: BERT
+The code in the repo is: version3_bert<br>
+It takes too long to predict. According to GPT, it may take up to days if using a CPU and hours using GPU.
+## Code 3: n_grams + Deep learning
+The code in the repo is: version4_n_grams<br>
+Discarded reason: Training n-grams is too long and the accuracy is too low. It is about 0.30501.
 
