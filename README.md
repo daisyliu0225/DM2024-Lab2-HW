@@ -173,8 +173,6 @@ model.compile(optimizer='adam',
 ```python
 from keras.callbacks import CSVLogger
 
-# csv_logger = CSVLogger('/content/drive/My Drive/NTHU/DM-Lab2-HW/logs/training_log.csv')
-
 # training setting
 epochs = 40
 batch_size = 512
@@ -243,11 +241,264 @@ Discarded reason: Training the decision tree is too long and the accuracy is too
 Code implementation:
 1. Code preprocessing<br>
 The preprocessing process is the same as BOW+Deep learning
-2. 
+2. Decision Tree implementation<br>
+```python
+# The code still uses BOW to do text mining
+# build analyzers (bag-of-words)
+BOW_500 = CountVectorizer(max_features=500, tokenizer=nltk.word_tokenize, 
+                         token_pattern=None)
+
+# apply analyzer to training data
+BOW_500.fit(train_data['text'])
+
+train_data_BOW_features_500 = BOW_500.transform(train_data['text']) 
+```
+<br>
+
+```python
+# for a classificaiton problem, you need to provide both training & testing data
+X_train = BOW_500.transform(train_data['text'])
+y_train = train_data['emotion']
+
+X_test = BOW_500.transform(train_data['text'])
+y_test = train_data['emotion']
+```
+<br>
+
+```python
+## build DecisionTree model
+DT_model = DecisionTreeClassifier(random_state=1)
+
+## training!
+DT_model = DT_model.fit(X_train, y_train)
+```
+<br>
+
+```python
+## predict!
+y_train_pred = DT_model.predict(X_train)
+y_test_pred = DT_model.predict(X_test)
+```
+<br>
+
+3. Evaluate the data<br>
+The same as the way of evaluating data in BOW+Deep learning
+
+4. Output the data<br>
+The same way as outputting data in BOW+Deep learning
+
 ## Code 2: BERT
 The code in the repo is: version3_bert<br>
 It takes too long to predict. According to GPT, it may take up to days if using a CPU and hours using GPU.
+<br>
+
+1. Data preprocessing<br>
+The preprocessing process is the same as BOW+Deep learning
+
+2. BERT implementation<br>
+```python
+# preprocessing in BERT
+def preprocess_data(df):
+    # Convert text to lowercase (or apply other preprocessing steps as needed)
+    df['text'] = df['text'].str.lower()
+    return df
+```
+<br>
+
+```python
+# tokenize text data for BERT input
+# Load the BERT tokenizer
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+# Tokenize the text data for BERT input
+def encode_data(df, tokenizer, max_length=128):
+    return tokenizer(list(df['text']), padding=True, truncation=True, max_length=max_length, return_tensors='pt')
+```
+<br>
+
+```python
+# create labels
+from sklearn.preprocessing import LabelEncoder
+# Step 1: Initialize the LabelEncoder
+label_encoder = LabelEncoder()
+
+# Step 2: Fit the label encoder on the training emotions and transform both train and test labels
+y_train['encoded'] = label_encoder.fit_transform(y_train['emotion'])
+y_test['encoded'] = label_encoder.transform(y_test['emotion'])
+
+# Convert the labels into tensors
+train_labels = torch.tensor(y_train['encoded'].values)
+test_labels = torch.tensor(y_test['encoded'].values)
+```
+<br>
+
+```python
+# Create DataLoader for training and testing
+train_dataset = TensorDataset(X_train_encodings.input_ids, X_train_encodings.attention_mask, train_labels)
+test_dataset = TensorDataset(X_test_encodings.input_ids, X_test_encodings.attention_mask, test_labels)
+
+train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=16)
+```
+<br>
+
+```python
+# load the pretrained BERT model
+model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=len(y_train['emotion'].unique()))
+
+# Set up the optimizer
+optimizer = AdamW(model.parameters(), lr=1e-5)
+```
+<br>
+
+```python
+# training
+# Function to train the model
+def train_model(model, train_loader, optimizer, device):
+    model.train()
+    total_loss = 0
+    for batch in train_loader:
+        input_ids, attention_mask, labels = [item.to(device) for item in batch]
+        optimizer.zero_grad()
+        outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
+        loss = outputs.loss
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    return total_loss / len(train_loader)
+
+# Function to evaluate the model
+def evaluate_model(model, test_loader, device):
+    model.eval()
+    all_preds = []
+    all_labels = []
+    with torch.no_grad():
+        for batch in test_loader:
+            input_ids, attention_mask, labels = [item.to(device) for item in batch]
+            outputs = model(input_ids, attention_mask=attention_mask)
+            logits = outputs.logits
+            preds = torch.argmax(logits, dim=1)
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+    return all_labels, all_preds
+```
+
+3. Evaluate the data<br>
+The same as the way of evaluating data in BOW+Deep learning
+
+4. Output the data<br>
+The same way as outputting data in BOW+Deep learning
+
 ## Code 3: n_grams + Deep learning
 The code in the repo is: version4_n_grams<br>
 Discarded reason: Training n-grams is too long and the accuracy is too low. It is about 0.30501.
 
+1. Data preprocessing<br>
+The preprocessing process is the same as BOW+Deep learning
+
+2. N-gram implementation<br>
+```python
+# Create a CountVectorizer with bigrams (2-grams)
+vectorizer = CountVectorizer(ngram_range=(2, 2))  # (2, 2) means bigrams
+vectorizer.fit(train_data['text'])
+
+# Do the transformation to input the deep learning
+X_training = vectorizer.transform(X_train_data['text'])
+```
+<br>
+
+```python
+import keras
+from sklearn.preprocessing import LabelEncoder
+
+label_encoder = LabelEncoder()
+label_encoder.fit(y_train)
+print('check label: ', label_encoder.classes_)
+print('\n## Before convert')
+print('y_train[0:4]:\n', y_train[0:4])
+print('\ny_train.shape: ', y_train.shape)
+print('y_test.shape: ', y_test.shape)
+
+def label_encode(le, labels):
+    enc = le.transform(labels)
+    return keras.utils.to_categorical(enc)
+
+def label_decode(le, one_hot_label):
+    dec = np.argmax(one_hot_label, axis=1)
+    return le.inverse_transform(dec)
+
+y_train = label_encode(label_encoder, y_train)
+y_test = label_encode(label_encoder, y_test)
+
+print('\n\n## After convert')
+print('y_train[0:4]:\n', y_train[0:4])
+print('\ny_train.shape: ', y_train.shape)
+print('y_test.shape: ', y_test.shape)
+```
+<br>
+
+```python
+# build the model
+from keras.models import Model
+from keras.layers import Input, Dense
+from keras.layers import ReLU, Softmax
+
+# input layer
+model_input = Input(shape=(input_shape, ))  # 500
+X = model_input
+
+# 1st hidden layer
+X_W1 = Dense(units=64)(X)  # 64
+H1 = ReLU()(X_W1)
+
+# 2nd hidden layer
+H1_W2 = Dense(units=64)(H1)  # 64
+H2 = ReLU()(H1_W2)
+
+# output layer
+H2_W3 = Dense(units=output_shape)(H2)  # 4
+H3 = Softmax()(H2_W3)
+
+model_output = H3
+
+# create model
+model = Model(inputs=[model_input], outputs=[model_output])
+
+# loss function & optimizer
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# show model construction
+model.summary()
+```
+<br>
+
+```python
+# train the model
+from keras.callbacks import CSVLogger
+
+# csv_logger = CSVLogger('/content/drive/My Drive/NTHU/DM-Lab2-HW/logs/training_log.csv')
+
+# training setting
+epochs = 3
+batch_size = 256
+
+# training!
+history = model.fit(X_train, y_train,
+                    epochs=epochs,
+                    batch_size=batch_size,
+                    validation_data = (X_test, y_test))
+print('training finish')
+```
+
+```python
+# predict the data
+pred_X_test = model.predict(X_test, batch_size=128)
+pred_X_test[:5]
+```
+3. Evaluate the data<br>
+The same as the way of evaluating data in BOW+Deep learning
+
+4. Output the data<br>
+The same way as outputting data in BOW+Deep learning
