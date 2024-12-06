@@ -502,3 +502,10 @@ The same as the way of evaluating data in BOW+Deep learning
 
 4. Output the data<br>
 The same way as outputting data in BOW+Deep learning
+
+
+# Kaggle Results
+## Public:
+![public result](./for_readme/public.png)
+## Private:
+![private result](./for_readme/result.png)
